@@ -26,3 +26,17 @@ class Expression:
 
     def getValue(self):
         return self.value
+    
+class If:
+
+    def __init__(self, field):
+        self.test = field.test
+        self.body = field.body
+        self.orelse = field.orelse
+        self.op = "If"
+    
+    def getOrElse(self):
+        return self.orelse
+    
+    def getTest(self):
+        return self.test
