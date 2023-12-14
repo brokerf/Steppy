@@ -3,8 +3,6 @@ import os
 import ast
 from steppy_classes import *
 
-
-
 def constructClass(module: ast.Module) -> list:
     """ Construct a class based on the ast.class it represents """
     classes = []
@@ -25,24 +23,11 @@ def IfElse(upper, middle, lower, ram, test, body, orelse):
     """ Evaluate an if-else statement """
     check_sucess = True
     if type(test) == ast.Name: #existence check i.e: if x: ...
-        if ram[test.id]:
-            line = ast.unparse(orelse[0])
-            if type(orelse[0]) == ast.If:
-                line = "el" + line
-            else:
-                line = "else:\n" + (" " * 4) + line
-            lower[0] = lower[0][0:lower[0].find(line) - 1]
-            print_Steppy(upper, middle, lower)
-        else: #check failed
+        if not ram[test.id]:
             check_sucess = False
-            line = ast.unparse(orelse[0])
-            if type(orelse[0]) == ast.If:
-                line = "el" + line
-            else:
-                line = "else\n" + (" " * 4) + line
-            lower[0] = lower[0][lower[0].find(line):]
+        else:
+            lower[0] = lower[0].replace(test.id, str(ram[test.id]), 1)
             print_Steppy(upper, middle, lower)
-    
     if type(test) == ast.Compare:
         if type(test.left) == ast.BoolOp:
             left = BoolOp(upper, middle, lower, ram, test.left)
@@ -50,6 +35,9 @@ def IfElse(upper, middle, lower, ram, test, body, orelse):
             left = BinOp(upper, middle, lower, ram, test.left.left, test.left.op, test.left.right)
         elif type(test.left) == ast.Name:
             left = ram[test.left.id]
+            if ram[test.left.id]:
+                lower[0] = lower[0].replace(test.left.id, str(left), 1)
+                print_Steppy(upper, middle, lower)
         elif type(test.left) == ast.Constant:
             left = test.left.value
 
@@ -127,26 +115,67 @@ def IfElse(upper, middle, lower, ram, test, body, orelse):
                     else:
                         check_sucess = False
                         break
-        if check_sucess:
-            line = ast.unparse(orelse[0])
-            if type(orelse[0]) == ast.If:
-                line = "el" + line
-            else:
-                line = "else:\n" + (" " * 4) + line
-            lower[0] = lower[0][0:lower[0].find(line) - 1]
-            print_Steppy(upper, middle, lower)
-        else: #check failed
-            check_sucess = False
-            line = ast.unparse(orelse[0])
-            if type(orelse[0]) == ast.If:
-                line = "el" + line
-            else:
-                line = "else\n" + (" " * 4) + line
-            lower[0] = lower[0][lower[0].find(line):]
-            print_Steppy(upper, middle, lower)
 
+    if check_sucess: #check suceed originally
+        line = ast.unparse(orelse[0])
+        if type(orelse[0]) == ast.If:
+            line = "el" + line
+        else:
+            line = "else:\n" + (" " * 4) + line
+        lower[0] = lower[0].replace(lower[0][3:lower[0].find(":")], "True", 1)
+        print_Steppy(upper, middle, lower)
+        lower[0] = lower[0][0:lower[0].find(line) - 1]
+        print_Steppy(upper, middle, lower)
+        IfBody(upper, middle, lower, body, ram)
+    else: #check failed
+        line = ast.unparse(orelse[0])
+        if type(orelse[0]) == ast.If:
+            line = "el" + line
+        else:
+            line = "else:\n" + (" " * 4) + line
+        lower[0] = lower[0].replace(lower[0][3:lower[0].find(":")], "False", 1)
+        print_Steppy(upper, middle, lower)
+        lower[0] = lower[0][lower[0].find(line):]
+        print_Steppy(upper, middle, lower)
+        IfBody(upper, middle, lower, orelse, ram)
 
+def IfBody(upper, middle, lower, body, ram):
+    """ Handle the body of the if-clause """
 
+    lower[0] = ast.unparse(body[0]) + "\n"
+    for x in range(len(body) - 1, 0, -1): # populate list with body of our if clause
+        lower.insert(1, ast.unparse(body[x]) + "\n")
+    print_Steppy(upper, middle, lower)
+    for i in body:
+        if type(i) == ast.Assign:
+            if type(i.value) == ast.Constant:
+                for x in i.targets:
+                    ram[x.id] = i.value.value
+            elif type(i.value) == tuple:
+                for x in range(len(i.targets)):
+                    ram[i.targets[x].id] = i.value[min(x, len(i.value))].value
+            upper.append(lower[0])
+            lower.pop(0)
+            
+        if type(i) == ast.BoolOp:
+            BoolOp(upper, middle, lower, ram, i)
+            
+        elif type(i) == ast.BinOp:
+            BinOp(upper, middle, lower, ram, i.left, i.op, i.right)
+            lower[0] = lower[0].replace("(", "")
+            lower[0] = lower[0].replace(")", "")
+            line2 = ast.parse(lower[0])
+            ram[line2.body[0].targets[0].id] = line2.body[0].value.value
+            upper.append(lower[0])
+            lower.pop(0)
+            
+        elif type(i) == ast.If:
+            IfElse(upper, middle, lower, ram, i.test, i.body, i.orelse)
+        elif type(i) == ast.Expr:
+            middle.append(lower[0] + "\n")
+            lower.pop(0)
+            print_Steppy(upper, middle, lower) 
+        #print_Steppy(upper, middle, lower)
 
 def BoolOp(upper, middle, lower, ram, value):
     """ Evaluate a Bool Operation """        
@@ -178,7 +207,6 @@ def BoolOp(upper, middle, lower, ram, value):
             case ast.Or:
                 return_value = return_value and (left or right)
     return return_value
-
 
 def BinOp(upper, middle, lower, ram, left, op, right):
     """ Evaluate Binary Operations recursively """
@@ -261,34 +289,33 @@ if __name__ == "__main__":
             for i in parsed.body:
                 lower.append(ast.unparse(i) + "\n")
             ram = dict() #construct a "RAM" to hold any vars we encounter
-            
+            #print(ast.dump(parsed, indent=4))
             print_Steppy(upper, middle, lower)
-            
             for classes in constructClass(parsed):
+                
                 targets = classes.getTargets() if classes.op != "If" else None
                 value = classes.getValue() if classes.op != "If" else None
                 if classes.op == "Assign":
-                        #print("ENTERING ASSIGN!")
-                        if type(targets[0]) is ast.Tuple: #multiple variables in one line, iter over all of them and add to ram
-                            for i in range(len(targets[0].elts)):
-                                ram[targets[0].elts[i].id] = value.elts[i].value
-                        else:
-                            ram[targets[0].id] = value.value
-                        upper.append(lower[0])
-                        lower.pop(0)
-                        #print(lower)
+                    #print("ENTERING ASSIGN!")
+                    if type(targets[0]) is ast.Tuple: #multiple variables in one line, iter over all of them and add to ram
+                        for i in range(len(targets[0].elts)):
+                            ram[targets[0].elts[i].id] = value.elts[i].value
+                    else:
+                        ram[targets[0].id] = value.value
+                    upper.append(lower[0])
+                    lower.pop(0)
                 elif classes.op == "BinOp":
-                        #print("ENTERING BinOP!")
-                        BinOp(upper, middle, lower, ram, value.left, value.op, value.right)
-                        lower[0] = lower[0].replace("(", "")
-                        lower[0] = lower[0].replace(")", "")
-                        line2 = ast.parse(lower[0])
-                        ram[line2.body[0].targets[0].id] = line2.body[0].value.value
-                        upper.append(lower[0])
-                        lower.pop(0)
+                    #print("ENTERING BinOP!")
+                    BinOp(upper, middle, lower, ram, value.left, value.op, value.right)
+                    lower[0] = lower[0].replace("(", "")
+                    lower[0] = lower[0].replace(")", "")
+                    line2 = ast.parse(lower[0])
+                    ram[line2.body[0].targets[0].id] = line2.body[0].value.value
+                    upper.append(lower[0])
+                    lower.pop(0)
                 elif classes.op == "Expression":
-                        middle.append(lower[0] + "\n")
-                        lower.pop(0)
+                    middle.append(lower[0] + "\n")
+                    lower.pop(0)
                 elif classes.op == "If":
                     test = classes.getTest()
                     body = classes.body
@@ -296,44 +323,4 @@ if __name__ == "__main__":
                     IfElse(upper, middle, lower, ram, test, body, orelse)
                 else:
                     raise NotImplementedError
-                print_Steppy(upper, middle, lower)    
-            """
-            while len(lower) > 0:
-                #print(len(lower))
-                line = ast.parse(lower[0])
-                #print(ast.dump(line, indent=8))
-                line_classes = constructClass(line)
-                for y in range(len(line_classes)):
-
-                    classes = line_classes[y]
-                    value = classes.getValue()
-                    targets = classes.getTargets()
-                    
-                    # step through one line at a time and do necessary stuff
-                    if classes.op == "Assign":
-                        #print("ENTERING ASSIGN!")
-                        if type(targets[0]) is ast.Tuple: #multiple variables in one line, iter over all of them and add to ram
-                            for i in range(len(targets[0].elts)):
-                                ram[targets[0].elts[i].id] = value.elts[i].value
-                        else:
-                            ram[targets[0].id] = value.value
-                        upper.append(lower[0])
-                        lower.pop(0)
-                        #print(lower)
-                    elif classes.op == "BinOp":
-                        #print("ENTERING BinOP!")
-                        BinOp(upper, middle, lower, ram, value.left, value.op, value.right)
-                        lower[0] = lower[0].replace("(", "")
-                        lower[0] = lower[0].replace(")", "")
-                        line2 = ast.parse(lower[0])
-                        ram[line2.body[0].targets[0].id] = line2.body[0].value.value
-                        upper.append(lower[0])
-                        lower.pop(0)
-                    elif classes.op == "Expression":
-                        middle.append(lower[0] + "\n")
-                        lower.pop(0)
-                    else:
-                        raise NotImplementedError
-                    print_Steppy(upper, middle, lower)
-            print(ram)
-            """
+                print_Steppy(upper, middle, lower)
