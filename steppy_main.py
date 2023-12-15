@@ -2,7 +2,8 @@ import sys
 import os
 import ast
 from steppy_classes import *
-
+to_text = False
+text_name = ""
 def constructClass(module: ast.Module) -> list:
     """ Construct a class based on the ast.class it represents """
     classes = []
@@ -116,16 +117,17 @@ def IfElse(upper, middle, lower, ram, test, body, orelse):
                         check_sucess = False
                         break
 
-    if check_sucess: #check suceed originally
-        line = ast.unparse(orelse[0])
-        if type(orelse[0]) == ast.If:
-            line = "el" + line
-        else:
-            line = "else:\n" + (" " * 4) + line
-        lower[0] = lower[0].replace(lower[0][3:lower[0].find(":")], "True", 1)
-        print_Steppy(upper, middle, lower)
-        lower[0] = lower[0][0:lower[0].find(line) - 1]
-        print_Steppy(upper, middle, lower)
+    """if check_sucess: #check suceed originally
+        if orelse:
+            line = ast.unparse(orelse[0])
+            if type(orelse[0]) == ast.If:
+                line = "el" + line
+            else:
+                line = "else:\n" + (" " * 4) + line
+            lower[0] = lower[0].replace(lower[0][3:lower[0].find(":")], "True", 1)
+            print_Steppy(upper, middle, lower)
+            lower[0] = lower[0][0:lower[0].find(line) - 1]
+            print_Steppy(upper, middle, lower)
         IfBody(upper, middle, lower, body, ram)
     else: #check failed
         line = ast.unparse(orelse[0])
@@ -137,7 +139,21 @@ def IfElse(upper, middle, lower, ram, test, body, orelse):
         print_Steppy(upper, middle, lower)
         lower[0] = lower[0][lower[0].find(line):]
         print_Steppy(upper, middle, lower)
-        IfBody(upper, middle, lower, orelse, ram)
+        IfBody(upper, middle, lower, orelse, ram)"""
+    if orelse:
+        line = ast.unparse(orelse[0])
+        if type(orelse[0]) == ast.If:
+            line = "el" + line
+        else:
+            line = "else:\n" + (" " * 4) + line
+        lower[0] = lower[0].replace(lower[0][3:lower[0].find(":")], str(check_sucess), 1) #write whether check suceed or not
+        print_Steppy(upper, middle, lower)
+        if check_sucess: #if check suceed we remove the orelse portion else we remove the body of the if statement
+            lower[0] = lower[0][0:lower[0].find(line) - 1]
+        else:
+            lower[0] = lower[0][lower[0].find(line):]
+        print_Steppy(upper, middle, lower)
+    IfBody(upper, middle, lower, body if check_sucess else orelse, ram)
 
 def IfBody(upper, middle, lower, body, ram):
     """ Handle the body of the if-clause """
@@ -262,21 +278,26 @@ def print_Steppy(upper, middle, lower):
     text += "#" * 10 + "\n"
     for i in lower: text += i
     print(text + "\n")
+    if to_text:
+        file = open(str(os.getcwd()) + "\\" + text_name, "a")
+        file.write("\n" + text + "\n")
+        file.close()
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("USAGE: py steppy_main.py [name of file to be stepped through]")
     else:
         try:
-            reader = open(str(os.getcwd() + "\\" + sys.argv[1]))
+            reader = open(str(os.getcwd() + "\\" + sys.argv[-1]))
             lines_solo = reader.readlines()
-            reader = open(str(os.getcwd() + "\\" + sys.argv[1]))
+            reader = open(str(os.getcwd() + "\\" + sys.argv[-1]))
             text = reader.read()
             lines = ""
             for x in lines_solo:
                 lines += x
         except FileNotFoundError: #no such file or wrong name
-            print("ERROR: No such file " + sys.argv[1] + " found!")
+            print("ERROR: No such file " + sys.argv[-1] + " found!")
         else:
             # construct three list[<str>] which each hold the current representation
             # of Steppy, what lines have been evaluated (upper), which lines will print (middle)
@@ -289,7 +310,28 @@ if __name__ == "__main__":
             for i in parsed.body:
                 lower.append(ast.unparse(i) + "\n")
             ram = dict() #construct a "RAM" to hold any vars we encounter
-            #print(ast.dump(parsed, indent=4))
+            if len(sys.argv) == 3:
+                if sys.argv[1] == "-v" or sys.argv[1] == "--verbose":
+                    print("#" * 20 + "\n")
+                    print(ast.dump(parsed, indent=4) + "\n")
+                    print("#" * 20 + "\n")
+                elif sys.argv[1] == "-t" or sys.argv[1] == "--text":
+                    text_name = str(sys.argv[-1]) + "_stepped_through.txt"
+                    text_file = open(str(os.getcwd() + "\\" + text_name), "w")
+                    text_file.write("Here is the step process of the file " + sys.argv[-1] + "\n")
+                    text_file.close()
+                    to_text = True
+                elif sys.argv[1] == "-h" or sys.argv[1] == "--help":
+                    print("This is the help message for Steppy - a step-through process for python programms.\n" + 
+                          "Currently Steppy supports only python files.\n" + 
+                          "Steppy supports 3 different options:" + 
+                          "\n" + 
+                          "\n" + 
+                          "-v or --verbose: shows ast.dump of the whole file, useful when you want to see how the file structure looks.\n" +
+                          "-h or --help: displays this message, you know how to use it.\n" + 
+                          "-t or --text: writes the output in the terminal to a text file named <your file name>_stepped_through.txt. " +  
+                          "Look in there for a more slowed down step through.\n")
+                    exit(1)
             print_Steppy(upper, middle, lower)
             for classes in constructClass(parsed):
                 
