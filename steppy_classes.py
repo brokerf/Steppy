@@ -40,3 +40,20 @@ class If:
     
     def getTest(self):
         return self.test
+    
+class AugAssign:
+
+    def __init__(self, field):
+        self.targets = field.target
+        self.op = "AugAssign"
+        self.value = field.value
+        self.ope = field.op
+    
+    def getTargets(self):
+        return self.targets
+    
+    def getValue(self):
+        return self.value
+    
+    def getOp(self):
+        return self.ope
