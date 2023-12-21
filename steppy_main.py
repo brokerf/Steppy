@@ -25,7 +25,7 @@ def constructClass(module: ast.Module) -> list:
             classes.append(clas)
     return classes
 
-def IfElse(upper, middle, lower, ram, test, body, orelse):
+def IfElse(upper: list[str], middle: list[str], lower: list[str], ram: dict, test, body, orelse) -> None:
     """ Evaluate an if-else statement """
     check_sucess = True
     if type(test) == ast.Name: #existence check i.e: if x: ...
@@ -137,7 +137,7 @@ def IfElse(upper, middle, lower, ram, test, body, orelse):
             #print_Steppy(upper, middle, lower)
     IfBody(upper, middle, lower, body if check_sucess else orelse, ram) #handle if - body
 
-def IfBody(upper, middle, lower, body, ram):
+def IfBody(upper: list[str], middle: list[str], lower: list[str], body: list[str], ram: dict) -> None:
     """ Handle the body of the If - statement """
 
     lower[0] = ast.unparse(body[0]) + "\n"
@@ -174,7 +174,7 @@ def IfBody(upper, middle, lower, body, ram):
             middle.append(lower[0] + "\n")
             lower.pop(0)
 
-def BoolOp(upper, middle, lower, ram, value):
+def BoolOp(upper: list[str], middle: list[str], lower: list[str], ram: dict, value) -> bool:
     """ Evaluate a Bool Operation """        
     op = value.op
     values = value.values
@@ -205,7 +205,7 @@ def BoolOp(upper, middle, lower, ram, value):
                 return_value = return_value and (left or right)
     return return_value
 
-def BinOp(upper, middle, lower, ram, left, op, right):
+def BinOp(upper: list[str], middle: list[str], lower: list[str], ram: dict, left, op, right):
     """ Evaluate Binary Operations recursively """
     if type(left) == ast.BinOp:
         left = BinOp(upper, middle, lower, ram, left.left, left.op, left.right)
@@ -214,24 +214,28 @@ def BinOp(upper, middle, lower, ram, left, op, right):
             index = lower[0].find("=")
             if index >= 0:
                 lower[0] = lower[0][:index] + lower[0][index:].replace(left.id, str(ram.get(left.id)), 1)
-                left = ram.get(left.id)
+            else:
+                lower[0] = lower[0].replace(left.id, str(ram.get(left.id)), 1)
+            left = ram.get(left.id)    
             print_Steppy(upper, middle, lower)
         else:
             raise NameError
     elif type(left) == ast.Constant:
         left = left.value
+    
     if type(right) == ast.BinOp:
         right = BinOp(upper, middle, lower, ram, right.left, right.op, right.right)
     elif type(right) == ast.Name:
         if right.id in ram:
             lower[0] = lower[0].replace(right.id, str(ram.get(right.id)), 1)
+            right = ram[right.id]
             print_Steppy(upper, middle, lower)
         else:
             raise NameError
     elif type(right) == ast.Constant:
         right = right.value
     """ Perform the mathematical operation that is stored in node.op and return the result of left and right"""
-    if type(right) in [int, float] and type(left) in [int, float]:
+    if type(right) in [int, float, str] and type(left) in [int, float, str]:
         left_index = lower[0].index(str(left))
         right_index = lower[0].index(str(right)) + len(str(right))
         if type(op) == ast.Add:
@@ -250,8 +254,11 @@ def BinOp(upper, middle, lower, ram, left, op, right):
             lower[0] = lower[0].replace(lower[0][left_index:right_index], str(left * right), 1)
             print_Steppy(upper, middle, lower)
             return left * right
-
-def print_Steppy(upper, middle, lower):
+"""
+def ForLoop(upper: list[str], middle: list[str], lower: list[str], ram: dict, body: ast.For):
+    #Handle the For - Loop here, by reconstructing it back 
+"""
+def print_Steppy(upper, middle, lower) -> None:
     """ Print current Steppy Status """
     text = ""
     for i in upper: text += i
@@ -282,6 +289,7 @@ if __name__ == "__main__":
                 lines += x
         except FileNotFoundError: #no such file or wrong name
             print("ERROR: No such file " + sys.argv[-1] + " found!")
+            exit(0)
         else:
             # construct three list[<str>] which each hold the current representation
             # of Steppy, what lines have been evaluated (upper), which lines will print (middle)
@@ -322,7 +330,7 @@ if __name__ == "__main__":
             for classes in constructClass(parsed):
                 
                 targets = classes.getTargets() if classes.op != "If" else None
-                value = classes.getValue() if classes.op != "If" else None
+                value = classes.getValue() if classes.op != ("If" or "ForLoop") else None
                 if classes.op == "Assign":
                     
                     if type(targets[0]) is ast.Tuple: #multiple variables in one line, iter over all of them and add to ram
@@ -347,9 +355,20 @@ if __name__ == "__main__":
                     upper.append(lower[0])
                     lower.pop(0)
                 elif classes.op == "Expression":
-                    #TODO: add actual expression handlng, for now it just puts it in the middle part
-                    middle.append(lower[0])
-                    lower.pop(0)
+                    if value.func.id == "print":
+                        for args in value.args:
+                            if type(args) == ast.BinOp:
+                                BinOp(upper, middle, lower, ram, args.left, args.op, args.right)
+                            elif type(args) == ast.Name:
+                                if ram[args.id]:
+                                    lower[0] = lower[0].replace(args.id, str(ram[args.id]))
+                                    print_Steppy(upper, middle, lower)
+                                else:
+                                    raise NameError
+                            elif type(args) == ast.Constant:
+                                continue
+                        middle.append(lower[0])
+                        lower.pop(0)
                 elif classes.op == "If":
                     """ We encountered an if statement, queue if - handling"""
                     test = classes.getTest()
@@ -371,9 +390,11 @@ if __name__ == "__main__":
                     lower[0] = lower[0].replace("(", " ")
                     upper.append(lower[0])
                     lower.pop(0)
+                #elif classes.op == "ForLoop":
+                    
                 else:
                     #Fail State
                     raise NotImplementedError
                 print_Steppy(upper, middle, lower)
             #print(ram)
-            
+            exit(1)

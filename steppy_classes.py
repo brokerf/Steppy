@@ -57,3 +57,27 @@ class AugAssign:
     
     def getOp(self):
         return self.ope
+    
+class ForLoop:
+
+    def __init__(self, field):
+        self.target = field.target
+        self.iter = field.iter
+        self.body = field.body
+        self.orelse = field.orelse
+        self.op = "ForLoop"
+
+    def getTargets(self):
+        return self.target
+    
+    def getIter(self):
+        return self.iter
+    
+    def getBody(self):
+        return self.body
+    
+    def getOrElse(self):
+        return self.orelse
+    
+    def getOp(self):
+        return self.op
