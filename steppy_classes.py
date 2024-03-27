@@ -1,4 +1,15 @@
 import ast
+
+"""
+Assign each class its default Values\n
+Each class has per default targets, values and op.\n
+Targets is either Body.targets or None in case its doesnt have any targets.\n
+Values represent the values which are substitued in the operations later on.\n
+Op is a string containing the type of the class to be invoked when needed.\n
+
+"""
+
+
 class Assign:
 
     def __init__(self, field):

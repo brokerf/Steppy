@@ -6,7 +6,10 @@ from steppy_classes import *
 to_text = False
 text_name = ""
 def constructClass(module: ast.Module) -> list:
-    """ Construct a classes based on the body of our ast.module of the whole file """
+    """ Construct classes based on the body of our ast.module of the whole file 
+    
+        Assign each member its own class based on its type
+    """
     classes = []
     #breakdown here
     for i in module.body:
@@ -26,7 +29,11 @@ def constructClass(module: ast.Module) -> list:
     return classes
 
 def IfElse(upper: list[str], middle: list[str], lower: list[str], ram: dict, test, body, orelse) -> None:
-    """ Evaluate an if-else statement """
+    """ Evaluate an if-else statement 
+    
+        Match type of the test that is to be perform and use an according function to handle it.\n
+        Additionally either go into its if - Body if if - Statement evaluated to True or to its else - Body otherwise.
+    """
     check_sucess = True
     if type(test) == ast.Name: #existence check i.e: if x: ...
         if not ram[test.id]:
@@ -134,16 +141,18 @@ def IfElse(upper: list[str], middle: list[str], lower: list[str], ram: dict, tes
             lower[0] = lower[0][0:lower[0].find(line) - 1]
         else:
             lower[0] = lower[0][lower[0].find(line):]
-            #print_Steppy(upper, middle, lower)
     IfBody(upper, middle, lower, body if check_sucess else orelse, ram) #handle if - body
 
 def IfBody(upper: list[str], middle: list[str], lower: list[str], body: list[str], ram: dict) -> None:
-    """ Handle the body of the If - statement """
+    """ Handle an if - statement 
+        
+        Get first member of lower as if - statement, work through its body and change the to-be-printed line accordingly
+    """
 
     lower[0] = ast.unparse(body[0]) + "\n"
     for x in range(len(body) - 1, 0, -1): # populate list with body of our if clause
         lower.insert(1, ast.unparse(body[x]) + "\n")
-    #print_Steppy(upper, middle, lower)
+    
     for i in body:
         print_Steppy(upper, middle, lower)
         if type(i) == ast.Assign:
@@ -175,7 +184,11 @@ def IfBody(upper: list[str], middle: list[str], lower: list[str], body: list[str
             lower.pop(0)
 
 def BoolOp(upper: list[str], middle: list[str], lower: list[str], ram: dict, value) -> bool:
-    """ Evaluate a Bool Operation """        
+    """ Evaluate a Bool Operation 
+    
+        Match values that are used in the bool - statement and apply according operation on value[i] and value[i + 1]. \n
+        Concatenate all evaluations together into one singular value and return it.
+    """        
     op = value.op
     values = value.values
     return_value = True #return value of the whole function
@@ -206,7 +219,12 @@ def BoolOp(upper: list[str], middle: list[str], lower: list[str], ram: dict, val
     return return_value
 
 def BinOp(upper: list[str], middle: list[str], lower: list[str], ram: dict, left, op, right):
-    """ Evaluate Binary Operations recursively """
+    """ Evaluate Binary Operations recursively 
+
+        Evaluate a binary operation recursively and return its final value. \n
+        Change the to-be printed lines accordingly aswell.
+    
+    """
     if type(left) == ast.BinOp:
         left = BinOp(upper, middle, lower, ram, left.left, left.op, left.right)
     elif type(left) == ast.Name:
@@ -234,7 +252,7 @@ def BinOp(upper: list[str], middle: list[str], lower: list[str], ram: dict, left
             raise NameError
     elif type(right) == ast.Constant:
         right = right.value
-    """ Perform the mathematical operation that is stored in node.op and return the result of left and right"""
+    """ Perform the mathematical operation that is stored in node.op and return the result of left and right """
     if type(right) in [int, float, str] and type(left) in [int, float, str]:
         left_index = lower[0].index(str(left))
         right_index = lower[0].index(str(right)) + len(str(right))
@@ -254,12 +272,12 @@ def BinOp(upper: list[str], middle: list[str], lower: list[str], ram: dict, left
             lower[0] = lower[0].replace(lower[0][left_index:right_index], str(left * right), 1)
             print_Steppy(upper, middle, lower)
             return left * right
-"""
-def ForLoop(upper: list[str], middle: list[str], lower: list[str], ram: dict, body: ast.For):
-    #Handle the For - Loop here, by reconstructing it back 
-"""
+
 def print_Steppy(upper, middle, lower) -> None:
-    """ Print current Steppy Status """
+    """ Print current Steppy Status 
+    
+        Iterate through upper, middle, lower and print out its contents, each list separated by "---"
+    """
     text = ""
     for i in upper: text += i
     text += "#" * 10 + "\n"
@@ -291,7 +309,7 @@ if __name__ == "__main__":
             print("ERROR: No such file " + sys.argv[-1] + " found!")
             exit(0)
         else:
-            # construct three list[<str>] which each hold the current representation
+            # construct three list[<str>] each holding the current representation
             # of Steppy, what lines have been evaluated (upper), which lines will print (middle)
             # and which lines are to be evaluated (lower). Then change them over time.
             
@@ -390,11 +408,8 @@ if __name__ == "__main__":
                     lower[0] = lower[0].replace("(", " ")
                     upper.append(lower[0])
                     lower.pop(0)
-                #elif classes.op == "ForLoop":
-                    
                 else:
                     #Fail State
                     raise NotImplementedError
                 print_Steppy(upper, middle, lower)
-            #print(ram)
             exit(1)
