@@ -34,6 +34,7 @@ def IfElse(upper: list[str], middle: list[str], lower: list[str], ram: dict, tes
         Match type of the test that is to be perform and use an according function to handle it.\n
         Additionally either go into its if - Body if if - Statement evaluated to True or to its else - Body otherwise.
     """
+    #line_value = lower[0]
     check_sucess = True
     if type(test) == ast.Name: #existence check i.e: if x: ...
         if not ram[test.id]:
@@ -129,18 +130,17 @@ def IfElse(upper: list[str], middle: list[str], lower: list[str], ram: dict, tes
                     else:
                         check_sucess = False
                         break
-    lower[0] = lower[0].replace(lower[0][3:lower[0].rfind(":")], str(check_sucess), 1) #write whether the check suceeded or not
+    
+    orelse_str = ast.unparse(orelse)
+    if type(orelse) == ast.If:
+        orelse_str = "el" + orelse_str
+    lower[0] = lower[0].replace(lower[0][3:lower[0].find(":")], str(check_sucess), 1)
+    #write whether the check suceeded or not
     print_Steppy(upper, middle, lower)
-    if len(orelse) > 0:
-        line = ast.unparse(orelse[0])
-        if type(orelse[0]) == ast.If:
-            line = "el" + line
-        else:
-            line = "else:\n" + (" " * 4) + line
-        if check_sucess: #if check suceed we remove the orelse portion else we remove the body of the if statement
-            lower[0] = lower[0][0:lower[0].find(line) - 1]
-        else:
-            lower[0] = lower[0][lower[0].find(line):]
+    if not check_sucess:
+        lower[0] = lower[0][lower[0].index(orelse_str):]
+    else:
+        lower[0] = lower[0][:lower[0].index(orelse_str)]
     IfBody(upper, middle, lower, body if check_sucess else orelse, ram) #handle if - body
 
 def IfBody(upper: list[str], middle: list[str], lower: list[str], body: list[str], ram: dict) -> None:
@@ -292,10 +292,27 @@ def print_Steppy(upper, middle, lower) -> None:
 
 
 if __name__ == "__main__":
+    
     if len(sys.argv) < 2:
-        print("USAGE: py steppy_main.py [name of file to be stepped through]")
+        print("USAGE: py steppy_main.py [options] [name of file to be stepped through]")
     else:
+        if sys.argv[-1] == "-h" or sys.argv[-1] == "--help":
+            print("This is the help message for Steppy - a step-through process for python programms.\n" + 
+                        "Currently Steppy supports only python files.\n" + 
+                        "Steppy supports 4 different options:" + 
+                        "\n" + 
+                        "\n" + 
+                        "-v or --verbose: shows ast.dump of the whole file, useful when you want to see how the file structure looks.\n" +
+                        "-h or --help: displays this message, you know how to use it.\n" + 
+                        "-t or --text: writes the output in the terminal to a text file named <your file name>_stepped_through.txt. " +  
+                        "Look in there for a more slowed down step through.\n" + 
+                        "-s or --show: shows at the end the state of the values that python associates with each variable.\n" +
+                        "\nThe syntax for steppy usage is: py steppy_main.py [options from above] [name of your file]\n" + 
+                        "For example: py steppy_main.py --text -v my_file.py\n" +
+                        "This will make a text file with steppy process in it, aswell as show the ast Tree of said file.")
+            exit(1)
         try:
+            
             reader = Path(str(sys.argv[-1])).open()
             #reader = open(str(os.getcwd() + "\\" + sys.argv[-1]))
             lines_solo = reader.readlines()
@@ -312,7 +329,6 @@ if __name__ == "__main__":
             # construct three list[<str>] each holding the current representation
             # of Steppy, what lines have been evaluated (upper), which lines will print (middle)
             # and which lines are to be evaluated (lower). Then change them over time.
-            
             upper = []
             middle = []
             lower = []
@@ -320,26 +336,27 @@ if __name__ == "__main__":
             for i in parsed.body:
                 lower.append(ast.unparse(i) + "\n")
             ram = dict() #construct a "RAM" to hold any vars we encounter
-            if "-v" in sys.orig_argv or "--verbose" in sys.orig_argv:
+            if "-v" in sys.argv or "--verbose" in sys.argv:
                 print("#" * 20 + "\n")
                 print(ast.dump(parsed, indent=4) + "\n")
                 print("#" * 20 + "\n")
-            if "-t" in sys.orig_argv or "--text" in sys.orig_argv:
+            if "-t" in sys.argv or "--text" in sys.argv:
                 text_name = str(sys.argv[-1]) + "_stepped_through.txt"
                 text_file = open(str(os.getcwd() + "\\" + text_name), "w")
                 text_file.write("Here is the step process of the file " + sys.argv[-1] + "\n")
                 text_file.close()
                 to_text = True
-            if "-h" in sys.orig_argv or "--help" in sys.orig_argv:
+            if "-h" in sys.argv or "--help" in sys.argv:
                 print("This is the help message for Steppy - a step-through process for python programms.\n" + 
                         "Currently Steppy supports only python files.\n" + 
-                        "Steppy supports 3 different options:" + 
+                        "Steppy supports 4 different options:" + 
                         "\n" + 
                         "\n" + 
                         "-v or --verbose: shows ast.dump of the whole file, useful when you want to see how the file structure looks.\n" +
                         "-h or --help: displays this message, you know how to use it.\n" + 
                         "-t or --text: writes the output in the terminal to a text file named <your file name>_stepped_through.txt. " +  
                         "Look in there for a more slowed down step through.\n" + 
+                        "-s or --show: shows at the end state of the values that python associates with each variable.\n" +
                         "\nThe syntax for steppy usage is: py steppy_main.py [options from above] [name of your file]\n" + 
                         "for example: py steppy_main.py --text -v my_file.py\n" +
                         "This will make a text file with steppy process in it, aswell as show the ast Tree of said file.")
@@ -412,4 +429,9 @@ if __name__ == "__main__":
                     #Fail State
                     raise NotImplementedError
                 print_Steppy(upper, middle, lower)
+
+            if "-s" in sys.argv or "--show" in sys.argv:
+                print("-" * (len(str(ram)) + 5))
+                print("| " + str(ram) + "  |")
+                print("⁻" * (len(str(ram)) + 5))
             exit(1)
