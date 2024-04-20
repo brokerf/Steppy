@@ -4,7 +4,7 @@ import ast
 from pathlib import Path
 from steppy_classes import *
 to_text = False
-text_name = ""
+fileName = ""
 def constructClass(module: ast.Module) -> list:
     """ Construct classes based on the body of our ast.module of the whole file 
     
@@ -155,6 +155,13 @@ def IfBody(upper: list[str], middle: list[str], lower: list[str], body: list[str
     
     for i in body:
         print_Steppy(upper, middle, lower)
+        last_line = ast.parse(upper[-1])
+        #print(ast.dump(last_line, indent=4))
+        #print(ast.dump(i, indent=4))
+        #try:
+        #    print(last_line.body[0].targets[0].id == i.targets[0].id)
+        #except:
+        #    pass
         if type(i) == ast.Assign:
             if type(i.value) == ast.Constant:
                 for x in i.targets:
@@ -162,6 +169,8 @@ def IfBody(upper: list[str], middle: list[str], lower: list[str], body: list[str
             elif type(i.value) == tuple:
                 for x in range(len(i.targets)):
                     ram[i.targets[x].id] = i.value[min(x, len(i.value))].value
+            if type(last_line.body[0]) == ast.Assign and last_line.body[0].targets[0].id == i.targets[0].id: #same operation on the same value
+                upper.pop()
             upper.append(lower[0])
             lower.pop(0)
             
@@ -276,7 +285,7 @@ def BinOp(upper: list[str], middle: list[str], lower: list[str], ram: dict, left
 def print_Steppy(upper, middle, lower) -> None:
     """ Print current Steppy Status 
     
-        Iterate through upper, middle, lower and print out its contents, each list separated by "---"
+        Iterate through upper, middle, lower and print out its contents, each list separated by "##########"
     """
     text = ""
     for i in upper: text += i
@@ -286,7 +295,7 @@ def print_Steppy(upper, middle, lower) -> None:
     for i in lower: text += i
     print(text + "\n")
     if to_text:
-        file = open(str(os.getcwd()) + "\\" + text_name, "a")
+        file = open(str(os.getcwd()) + "\\" + fileName, "a")
         file.write("\n" + text + "\n")
         file.close()
 
@@ -294,8 +303,9 @@ def print_Steppy(upper, middle, lower) -> None:
 if __name__ == "__main__":
     
     if len(sys.argv) < 2:
-        print("USAGE: py steppy_main.py [options] [name of file to be stepped through]")
+        print("USAGE: py steppy_main.py [file name] [options] [args]")
     else:
+        print(sys.argv)
         if sys.argv[-1] == "-h" or sys.argv[-1] == "--help":
             print("This is the help message for Steppy - a step-through process for python programms.\n" + 
                         "Currently Steppy supports only python files.\n" + 
@@ -304,7 +314,7 @@ if __name__ == "__main__":
                         "\n" + 
                         "-v or --verbose: shows ast.dump of the whole file, useful when you want to see how the file structure looks.\n" +
                         "-h or --help: displays this message, you know how to use it.\n" + 
-                        "-t or --text: writes the output in the terminal to a text file named <your file name>_stepped_through.txt. " +  
+                        "-o or --output: writes the output in the terminal to a text file named <your file name>_stepped_through.txt. " +  
                         "Look in there for a more slowed down step through.\n" + 
                         "-s or --show: shows at the end the state of the values that python associates with each variable.\n" +
                         "\nThe syntax for steppy usage is: py steppy_main.py [options from above] [name of your file]\n" + 
@@ -313,17 +323,17 @@ if __name__ == "__main__":
             exit(1)
         try:
             
-            reader = Path(str(sys.argv[-1])).open()
+            reader = Path(str(sys.argv[1])).open()
             #reader = open(str(os.getcwd() + "\\" + sys.argv[-1]))
             lines_solo = reader.readlines()
-            reader = Path(str(sys.argv[-1])).open()
+            reader = Path(str(sys.argv[1])).open()
             #reader = open(str(os.getcwd() + "\\" + sys.argv[-1]))
             text = reader.read()
             lines = ""
             for x in lines_solo:
                 lines += x
         except FileNotFoundError: #no such file or wrong name
-            print("ERROR: No such file " + sys.argv[-1] + " found!")
+            print("ERROR: No such file " + sys.argv[1] + " found!")
             exit(0)
         else:
             # construct three list[<str>] each holding the current representation
@@ -340,11 +350,15 @@ if __name__ == "__main__":
                 print("#" * 20 + "\n")
                 print(ast.dump(parsed, indent=4) + "\n")
                 print("#" * 20 + "\n")
-            if "-t" in sys.argv or "--text" in sys.argv:
-                text_name = str(sys.argv[-1]) + "_stepped_through.txt"
-                text_file = open(str(os.getcwd() + "\\" + text_name), "w")
-                text_file.write("Here is the step process of the file " + sys.argv[-1] + "\n")
-                text_file.close()
+            if "-o" in sys.argv or "--output" in sys.argv:
+                try:
+                    fileName = sys.argv[sys.argv.index("-o") + 1]
+                except ValueError:
+                    fileName = sys.argv[sys.argv.index("--output") + 1]
+                if fileName[-4:] != ".txt": fileName += ".txt" #hardcoded to be a text file but could be altered later on
+                file = open(str(os.getcwd() + "\\" + fileName), "w")
+                file.write("Here is the step process of the file " + str(sys.argv[1]) + "\n")
+                file.close()
                 to_text = True
             if "-h" in sys.argv or "--help" in sys.argv:
                 print("This is the help message for Steppy - a step-through process for python programms.\n" + 
@@ -354,11 +368,11 @@ if __name__ == "__main__":
                         "\n" + 
                         "-v or --verbose: shows ast.dump of the whole file, useful when you want to see how the file structure looks.\n" +
                         "-h or --help: displays this message, you know how to use it.\n" + 
-                        "-t or --text: writes the output in the terminal to a text file named <your file name>_stepped_through.txt. " +  
+                        "-o or --output: writes the output in the terminal to a text file named <your file name>_stepped_through.txt. " +  
                         "Look in there for a more slowed down step through.\n" + 
                         "-s or --show: shows at the end state of the values that python associates with each variable.\n" +
-                        "\nThe syntax for steppy usage is: py steppy_main.py [options from above] [name of your file]\n" + 
-                        "for example: py steppy_main.py --text -v my_file.py\n" +
+                        "\nThe syntax for steppy usage is: py steppy_main.py [name of your file] [options from above]\n" + 
+                        "for example: py steppy_main.py my_file.py --output my_file_output -v\n" +
                         "This will make a text file with steppy process in it, aswell as show the ast Tree of said file.")
                 exit(1)
             print_Steppy(upper, middle, lower)
@@ -367,7 +381,6 @@ if __name__ == "__main__":
                 targets = classes.getTargets() if classes.op != "If" else None
                 value = classes.getValue() if classes.op != ("If" or "ForLoop") else None
                 if classes.op == "Assign":
-                    
                     if type(targets[0]) is ast.Tuple: #multiple variables in one line, iter over all of them and add to ram
                         for i in range(len(targets[0].elts)):
                             ram[targets[0].elts[i].id] = value.elts[i].value
@@ -376,15 +389,16 @@ if __name__ == "__main__":
                         for x in value.elts:
                             new_list.append(x.value)
                         ram[targets[0].id] = new_list
-                    else:    
+                    else:
+
                         ram[targets[0].id] = value.value
                     upper.append(lower[0])
                     lower.pop(0)
                 elif classes.op == "BinOp":
                     """ We encountered a BinOp, evaluate that and strip the line in lower from all <(>,<)> accurances"""
                     BinOp(upper, middle, lower, ram, value.left, value.op, value.right)
-                    lower[0] = lower[0].replace("(", "")
-                    lower[0] = lower[0].replace(")", "")
+                    lower[0] = lower[0].replace("(", " ")
+                    lower[0] = lower[0].replace(")", " ")
                     line2 = ast.parse(lower[0])
                     ram[line2.body[0].targets[0].id] = line2.body[0].value.value
                     upper.append(lower[0])
@@ -402,7 +416,7 @@ if __name__ == "__main__":
                                     raise NameError
                             elif type(args) == ast.Constant:
                                 continue
-                        middle.append(lower[0])
+                        middle.append("'" + lower[0][6:-2] + "'" +  "\n")
                         lower.pop(0)
                 elif classes.op == "If":
                     """ We encountered an if statement, queue if - handling"""
@@ -427,7 +441,7 @@ if __name__ == "__main__":
                     lower.pop(0)
                 else:
                     #Fail State
-                    raise NotImplementedError
+                    raise NotImplementedError("This class is not handled yet!")
                 print_Steppy(upper, middle, lower)
 
             if "-s" in sys.argv or "--show" in sys.argv:
