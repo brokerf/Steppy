@@ -5,6 +5,7 @@ from pathlib import Path
 from steppy_classes import *
 to_text = False
 fileName = ""
+paused = False
 def constructClass(module: ast.Module) -> list:
     """ Construct classes based on the body of our ast.module of the whole file 
     
@@ -179,8 +180,8 @@ def IfBody(upper: list[str], middle: list[str], lower: list[str], body: list[str
            
         elif type(i) == ast.BinOp:
             BinOp(upper, middle, lower, ram, i.left, i.op, i.right)
-            lower[0] = lower[0].replace("(", "")
-            lower[0] = lower[0].replace(")", "")
+            lower[0] = lower[0].replace("(", " ")
+            lower[0] = lower[0].replace(")", " ")
             line2 = ast.parse(lower[0])
             ram[line2.body[0].targets[0].id] = line2.body[0].value.value
             upper.append(lower[0])
@@ -265,6 +266,9 @@ def BinOp(upper: list[str], middle: list[str], lower: list[str], ram: dict, left
     if type(right) in [int, float, str] and type(left) in [int, float, str]:
         left_index = lower[0].index(str(left))
         right_index = lower[0].index(str(right)) + len(str(right))
+        if lower[0][left_index - 1] == "(" and lower[0][right_index] == ")":   #surrounded by brackets so remove them
+            left_index -= 1
+            right_index += 1
         if type(op) == ast.Add:
             lower[0] = lower[0].replace(lower[0][left_index:right_index], str(left + right), 1)
             print_Steppy(upper, middle, lower)
@@ -305,7 +309,6 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("USAGE: py steppy_main.py [file name] [options] [args]")
     else:
-        print(sys.argv)
         if sys.argv[-1] == "-h" or sys.argv[-1] == "--help":
             print("This is the help message for Steppy - a step-through process for python programms.\n" + 
                         "Currently Steppy supports only python files.\n" + 
@@ -377,7 +380,6 @@ if __name__ == "__main__":
                 exit(1)
             print_Steppy(upper, middle, lower)
             for classes in constructClass(parsed):
-                
                 targets = classes.getTargets() if classes.op != "If" else None
                 value = classes.getValue() if classes.op != ("If" or "ForLoop") else None
                 if classes.op == "Assign":
@@ -397,8 +399,8 @@ if __name__ == "__main__":
                 elif classes.op == "BinOp":
                     """ We encountered a BinOp, evaluate that and strip the line in lower from all <(>,<)> accurances"""
                     BinOp(upper, middle, lower, ram, value.left, value.op, value.right)
-                    lower[0] = lower[0].replace("(", " ")
-                    lower[0] = lower[0].replace(")", " ")
+                    lower[0] = lower[0].replace("(", "")
+                    lower[0] = lower[0].replace(")", "")
                     line2 = ast.parse(lower[0])
                     ram[line2.body[0].targets[0].id] = line2.body[0].value.value
                     upper.append(lower[0])
