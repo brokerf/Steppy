@@ -6,6 +6,6 @@ Steppy uses the ast Module with its various methods, to build a tree structure o
 Currently it supports: If - statements, Assignments, Binary Operation, Bool Operations, Expressions, Augmented Assignments
 
 GER version:
-Steppy, ein Stepper für Python, ist ein Werkzeig um durch das eigene Dokument schrittartig zu gehen.
+Steppy, ein Stepper für Python, ist ein Werkzeug um durch das eigene Dokument schrittartig zu gehen.
 Steppy benutzt das ast Modul, um aus dem Dokument ein ast Baum zu bilden um alle Blätter zu evaluieren.
 Zur Zeit kann Steppy if - statements, Zuweisungen, Augmentierte Zuweisungen, Binäre Operationen, Ausdrücke, Bool Operationen behandeln.

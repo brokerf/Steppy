@@ -615,9 +615,9 @@ if __name__ == "__main__":
             print_Steppy(upper, middle, lower)
             for classes in constructClass(parsed):
                 handleClasses(upper, middle, lower, ram, classes)
-                #print_Steppy(upper, middle, lower)
+                print_Steppy(upper, middle, lower)
             if "-s" in sys.argv or "--show" in sys.argv:
-                print("+" + "-" * (len(str(ram)) + 5))
+                print("+" + "-" * (len(str(ram)) + 3) + "+")
                 print("| " + str(ram) + "  |")
-                print("+" + "⁻" * (len(str(ram)) + 5))
+                print("+" + "⁻" * (len(str(ram)) + 3) + "+")
             exit(1)
