@@ -1,2 +1,5 @@
 *.txt
 /test[0-9].py
+/generated[0-9].py
+generated3_test.py
+__pycache__
