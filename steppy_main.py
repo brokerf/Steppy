@@ -45,9 +45,8 @@ def IfElse(upper: list[str], middle: list[str], lower: list[str], ram: dict, tes
     """ Evaluate an if-else statement 
     
         Match type of the test that is to be perform and use an according function to handle it.\n
-        Additionally either go into its if - Body if if - Statement evaluated to True or to its else - Body otherwise.
+        Additionally either go into it's if - Body if if - Statement evaluated to True or to it's else - Body otherwise.
     """
-    #line_value = lower[0]
     check_sucess = True
     if type(test) == ast.Name: #existence check i.e: if x: ...
         if not ram[test.id]:
@@ -58,106 +57,22 @@ def IfElse(upper: list[str], middle: list[str], lower: list[str], ram: dict, tes
     """ Construct both left and right values recursiverly if needed to compare them"""
     if type(test) == ast.Compare:
         check_sucess = handleCompare(upper, middle, lower, ram, Compare(test))
-        """if type(test.left) == ast.BoolOp:
-            left = BoolOp(upper, middle, lower, ram, test.left)
-        elif type(test.left) == ast.BinOp:
-            left = BinOp(upper, middle, lower, ram, test.left.left, test.left.op, test.left.right)
-        elif type(test.left) == ast.Name:
-            left = ram[test.left.id]
-            if ram[test.left.id]:
-                lower[0] = lower[0].replace(test.left.id, str(left), 1)
-                print_Steppy(upper, middle, lower)
-        elif type(test.left) == ast.Constant:
-            left = test.left.value
-         Iterate over all variables in our testing operations
-        for i in range(len(test.ops)):
-            comp_var = test.comparators[i] #assignment of testig variable
-            if type(comp_var) == ast.Name:
-                lower[0] = lower[0].replace(comp_var.id, ram[comp_var.id], 1)
-                print_Steppy(upper, middle, lower)
-                comp_var = ram[comp_var.id]
-            elif type(comp_var) == ast.Constant:
-                comp_var = comp_var.value
-            elif type(comp_var) == ast.BinOp:
-                comp_var = BinOp(upper, middle, lower, ram, comp_var.left, comp_var.op, comp_var.right)
-            elif type(comp_var) == ast.BoolOp:
-                comp_var = BoolOp(upper, middle, lower, ram, comp_var)
-            op = test.ops[i] #match operation to be made
-            match type(op):
-                case ast.Gt:
-                    if left > comp_var:
-                        left = comp_var
-                    else:
-                        check_sucess = False
-                        break
-                case ast.GtE:
-                    if left >= comp_var:
-                        left = comp_var
-                    else:
-                        check_sucess = False
-                        break
-                case ast.Lt:
-                    if left < comp_var:
-                        left = comp_var
-                    else:
-                        check_sucess = False
-                        break
-                case ast.LtE:
-                    if left <= comp_var:
-                        left = comp_var
-                    else:
-                        check_sucess = False
-                        break
-                case ast.Is:
-                    if left is comp_var:
-                        left = comp_var
-                    else:
-                        check_sucess = False
-                        break
-                case ast.IsNot:
-                    if left is not comp_var:
-                        left = comp_var
-                    else:
-                        check_sucess = False
-                        break
-                case ast.In:
-                    if left in comp_var:
-                        left = comp_var
-                    else:
-                        check_sucess = False
-                        break
-                case ast.IsNot:
-                    if left is not comp_var:
-                        left = comp_var
-                    else:
-                        check_sucess = False
-                        break
-                case ast.Eq:
-                    if left == comp_var:
-                        left = comp_var
-                    else:
-                        check_sucess = False
-                        break
-                case ast.NotEq:
-                    if left != comp_var:
-                        left = comp_var
-                    else:
-                        check_sucess = False
-                        break"""
     if type(test) == ast.UnaryOp:
         check_sucess = handleUnaryOp(upper, middle, lower, ram, UnaryOp(test))
+    if type(test) == ast.BoolOp:
+        check_sucess = BoolOp(upper, middle, lower, ram, test)
     orelse_str = ast.unparse(orelse)
-    if type(orelse) == ast.If:
+    if type(orelse[0]) == ast.If:
         orelse_str = "el" + orelse_str
     else:
-        orelse_str = "else"
-    lower[0] = lower[0].replace(lower[0][3:lower[0].find(":")], str(check_sucess), 1)
+        orelse_str = "else:\n" + " " * 4 + orelse_str
     #write whether the check suceeded or not
-    print_Steppy(upper, middle, lower)
+    #print_Steppy(upper, middle, lower)
     if not check_sucess:
         lower[0] = lower[0][lower[0].index(orelse_str):]
     else:
         lower[0] = lower[0][:lower[0].index(orelse_str)]
+    print_Steppy(upper, middle, lower)
     IfBody(upper, middle, lower, body if check_sucess else orelse, ram) #handle if - body
 
 def IfBody(upper: list[str], middle: list[str], lower: list[str], body: list[str], ram: dict) -> None:
@@ -173,12 +88,6 @@ def IfBody(upper: list[str], middle: list[str], lower: list[str], body: list[str
     for i in body:
         print_Steppy(upper, middle, lower)
         last_line = ast.parse(upper[-1])
-        #print(ast.dump(last_line, indent=4))
-        #print(ast.dump(i, indent=4))
-        #try:
-        #    print(last_line.body[0].targets[0].id == i.targets[0].id)
-        #except:
-        #    pass
         if type(i) == ast.Assign:
             if type(i.value) == ast.Constant:
                 for x in i.targets:
@@ -224,15 +133,21 @@ def handleCompare(upper, middle, lower, ram, compare) -> bool:
             left = left.value
         case ast.BoolOp:
             left = BoolOp(upper, middle, lower, ram, left)
+        case ast.Name:
+            lower[0] = lower[0].replace(str(left.id), str(ram[left.id]))
+            left = ram[left.id]
+            print_Steppy(upper, middle, lower)
     left_value = left
     for i in range(len(ops)):
         operation = ops[i]
         right_value = right[i]
         compare_sucess &= compare_values(left_value, right_value, operation, upper, middle, lower, ram)
         left_value = right_value
-    x = ast.unparse(compare)
-    left_index = lower[0].index(x)
-    right_index = left_index + len(x)
+    if type(left_value) == ast.Name:
+        left_value = ram[left_value.id]
+    print("handleCompare", left_value)
+    left_index = lower[0].index(str(left))
+    right_index = lower[0].index(str(left_value)) + len(str(left_value))
     if lower[0][left_index - 1] == "(" and lower[0][right_index + 1] == ")":
         left_index -= 1
         right_index += 1
@@ -250,6 +165,8 @@ def compare_values(left, right, operation, upper, middle, lower, ram):
         case ast.Constant:
             right = right.value
         case ast.Name:
+            lower[0] = lower[0].replace(str(right.id), str(ram[right.id]))
+            print_Steppy(upper, middle, lower)
             right = ram[right.id]
     match type(operation):
         case ast.LtE:
@@ -262,6 +179,17 @@ def compare_values(left, right, operation, upper, middle, lower, ram):
             return left >= right
         case ast.Eq:
             return left == right
+        case ast.NotEq:
+            return left != right
+        case ast.Is:
+            return left is right
+        case ast.IsNot:
+            return left is not right
+        case ast.In:
+            return left in right
+        case ast.NotIn:
+            return left not in right
+        
 
 def BoolOp(upper: list[str], middle: list[str], lower: list[str], ram: dict, value) -> bool:
     """ Evaluate a Bool Operation 
@@ -300,14 +228,13 @@ def BoolOp(upper: list[str], middle: list[str], lower: list[str], ram: dict, val
                 right = handleUnaryOp(upper, middle, lower, ram, UnaryOp(values[i + 1]))
             case ast.Compare:
                 right = handleCompare(upper, middle, lower, ram, Compare(values[i + 1]))
-        x = ast.BoolOp(op, values=[ast.Constant(left), ast.Constant(right)])
-        left_index = lower[0].index(ast.unparse(x))
-        right_index = left_index + len(ast.unparse(x))
-        
-        if lower[0][left_index - 1] == "(" and lower[0][right_index + 1] == ")":
+        x = ast.unparse(ast.BoolOp(op, values=[ast.Constant(left), ast.Constant(right)])).replace("'", "")
+        left_index = lower[0].index(x)
+        right_index = left_index + len(x)
+        if lower[0][left_index - 1] == "(" and lower[0][right_index] == ")":
             left_index -= 1
             right_index += 1
-        print("BoolOp", lower[0][left_index - 1:right_index + 1])
+        #print("BoolOp", lower[0][left_index - 1:right_index + 1])
         match type(op):
             case ast.And:
                 return_value = return_value and (left and right)
@@ -402,7 +329,7 @@ def print_Steppy(upper, middle, lower) -> None:
         text += i
     print(text + "\n")
     if to_text:
-        file = open(str(os.getcwd()) + "\\" + fileName, "a")
+        file = open(Path(fileName), "a")
         file.write("\n" + text + "\n")
         file.close()
 
@@ -560,15 +487,16 @@ if __name__ == "__main__":
             exit(1)
         try:
             
-            reader = Path(str(sys.argv[1])).open()
+            reader = open(Path(str(sys.argv[1])))
             #reader = open(str(os.getcwd() + "\\" + sys.argv[-1]))
             lines_solo = reader.readlines()
-            reader = Path(str(sys.argv[1])).open()
+            reader = open(Path(str(sys.argv[1])))
             #reader = open(str(os.getcwd() + "\\" + sys.argv[-1]))
             text = reader.read()
             lines = ""
             for x in lines_solo:
                 lines += x
+            reader.close()
         except FileNotFoundError: #no such file or wrong name
             print("ERROR: No such file " + sys.argv[1] + " found!")
             exit(0)
@@ -593,7 +521,7 @@ if __name__ == "__main__":
                 except ValueError:
                     fileName = sys.argv[sys.argv.index("--output") + 1]
                 if fileName[-4:] != ".txt": fileName += ".txt" #hardcoded to be a text file but could be altered later on
-                file = open(str(os.getcwd() + "\\" + fileName), "w")
+                file = open(Path(fileName), "w")
                 file.write("Here is the step process of the file " + str(sys.argv[1]) + "\n")
                 file.close()
                 to_text = True
@@ -617,7 +545,7 @@ if __name__ == "__main__":
                 handleClasses(upper, middle, lower, ram, classes)
                 print_Steppy(upper, middle, lower)
             if "-s" in sys.argv or "--show" in sys.argv:
-                print("+" + "-" * (len(str(ram)) + 3) + "+")
-                print("| " + str(ram) + "  |")
-                print("+" + "⁻" * (len(str(ram)) + 3) + "+")
+                print("+" + "-" * (len(str(ram)) + 2) + "+")
+                print("| " + str(ram) + " |")
+                print("+" + "⁻" * (len(str(ram)) + 2) + "+")
             exit(1)
