@@ -67,7 +67,6 @@ def IfElse(upper: list[str], middle: list[str], lower: list[str], ram: dict, tes
     else:
         orelse_str = "else:\n" + " " * 4 + orelse_str
     #write whether the check suceeded or not
-    #print_Steppy(upper, middle, lower)
     if not check_sucess:
         lower[0] = lower[0][lower[0].index(orelse_str):]
     else:
@@ -124,6 +123,7 @@ def handleCompare(upper, middle, lower, ram, compare) -> bool:
     ops = compare.getOps()
     right = compare.getComparators()
     compare_sucess = True
+
     match type(left):
         case ast.BinOp:
             left = BinOp(upper, middle, lower, ram, left.left, left.op, left.right)
@@ -138,21 +138,24 @@ def handleCompare(upper, middle, lower, ram, compare) -> bool:
             left = ram[left.id]
             print_Steppy(upper, middle, lower)
     left_value = left
+    
     for i in range(len(ops)):
         operation = ops[i]
         right_value = right[i]
         compare_sucess &= compare_values(left_value, right_value, operation, upper, middle, lower, ram)
         left_value = right_value
+    
     if type(left_value) == ast.Name:
         left_value = ram[left_value.id]
-    print("handleCompare", left_value)
     left_index = lower[0].index(str(left))
     right_index = lower[0].index(str(left_value)) + len(str(left_value))
+    
     if lower[0][left_index - 1] == "(" and lower[0][right_index + 1] == ")":
         left_index -= 1
         right_index += 1
     lower[0] = lower[0].replace(lower[0][left_index:right_index], str(compare_sucess))
     print_Steppy(upper, middle, lower)
+    
     return compare_sucess
 
 def compare_values(left, right, operation, upper, middle, lower, ram):
@@ -168,6 +171,7 @@ def compare_values(left, right, operation, upper, middle, lower, ram):
             lower[0] = lower[0].replace(str(right.id), str(ram[right.id]))
             print_Steppy(upper, middle, lower)
             right = ram[right.id]
+    
     match type(operation):
         case ast.LtE:
             return left <= right
@@ -201,6 +205,7 @@ def BoolOp(upper: list[str], middle: list[str], lower: list[str], ram: dict, val
     values = value.getValues()
     return_value = True #return value of the whole function
     right = None
+    
     for i in range(0, len(values) - 1):
         match type(values[i]):
             case ast.BoolOp:
@@ -215,6 +220,7 @@ def BoolOp(upper: list[str], middle: list[str], lower: list[str], ram: dict, val
                 left = handleUnaryOp(upper, middle, lower, ram, UnaryOp(values[i]))
             case ast.Compare:
                 left = handleCompare(upper, middle, lower, ram, Compare(values[i]))
+        
         match type(values[i + 1]):
             case ast.BoolOp:
                 right = BoolOp(upper, middle, lower, ram, values[i + 1])
@@ -228,13 +234,15 @@ def BoolOp(upper: list[str], middle: list[str], lower: list[str], ram: dict, val
                 right = handleUnaryOp(upper, middle, lower, ram, UnaryOp(values[i + 1]))
             case ast.Compare:
                 right = handleCompare(upper, middle, lower, ram, Compare(values[i + 1]))
+        
         x = ast.unparse(ast.BoolOp(op, values=[ast.Constant(left), ast.Constant(right)])).replace("'", "")
         left_index = lower[0].index(x)
         right_index = left_index + len(x)
+        
         if lower[0][left_index - 1] == "(" and lower[0][right_index] == ")":
             left_index -= 1
             right_index += 1
-        #print("BoolOp", lower[0][left_index - 1:right_index + 1])
+        
         match type(op):
             case ast.And:
                 return_value = return_value and (left and right)
@@ -242,6 +250,7 @@ def BoolOp(upper: list[str], middle: list[str], lower: list[str], ram: dict, val
                 return_value = return_value and (left or right)
         lower[0] = lower[0].replace(lower[0][left_index:right_index], str(return_value))
         print_Steppy(upper, middle, lower)      
+    
     return return_value
 
 def BinOp(upper: list[str], middle: list[str], lower: list[str], ram: dict, left, op, right):
@@ -283,6 +292,7 @@ def BinOp(upper: list[str], middle: list[str], lower: list[str], ram: dict, left
     elif type(right) == ast.Constant:
         right = right.value
     """ Perform the mathematical operation that is stored in node.op and return the result of left and right """
+    
     if type(right) in [int, float, str] and type(left) in [int, float, str]:
         x = ast.BinOp(ast.Constant(left), op, ast.Constant(right))
         left_index = lower[0].index(ast.unparse(x))
@@ -476,22 +486,19 @@ if __name__ == "__main__":
                         "Steppy supports 4 different options:" + 
                         "\n" + 
                         "\n" + 
-                        "-v or --verbose: shows ast.dump of the whole file, useful when you want to see how the file structure looks.\n" +
+                        "-v or --verbose: shows ast.dump of the whole file, useful when you want to see how the Advanced Syntax Tree structure looks.\n" +
                         "-h or --help: displays this message, you know how to use it.\n" + 
-                        "-o or --output: writes the output in the terminal to a text file named <your file name>_stepped_through.txt. " +  
+                        "-o or --output: writes the output to a text file of your choosing, default is <your file name>_stepped_through.txt. " +  
                         "Look in there for a more slowed down step through.\n" + 
                         "-s or --show: shows at the end the state of the values that python associates with each variable.\n" +
                         "\nThe syntax for steppy usage is: py steppy_main.py [options from above] [name of your file]\n" + 
                         "For example: py steppy_main.py my_file.py --output my_file_output -v\n" +
-                        "This will make a text file with steppy process in it, aswell as show the ast Tree of said file.")
+                        "This will make a text file with steppy process in it, aswell as show the Advanced Syntax Tree of said file.")
             exit(1)
         try:
-            
             reader = open(Path(str(sys.argv[1])))
-            #reader = open(str(os.getcwd() + "\\" + sys.argv[-1]))
             lines_solo = reader.readlines()
             reader = open(Path(str(sys.argv[1])))
-            #reader = open(str(os.getcwd() + "\\" + sys.argv[-1]))
             text = reader.read()
             lines = ""
             for x in lines_solo:
@@ -531,11 +538,11 @@ if __name__ == "__main__":
                         "Steppy supports 4 different options:" + 
                         "\n" + 
                         "\n" + 
-                        "-v or --verbose: shows ast.dump of the whole file, useful when you want to see how the file structure looks.\n" +
+                        "-v or --verbose: shows ast.dump of the whole file, useful when you want to see how the syntax tree structure looks.\n" +
                         "-h or --help: displays this message, you know how to use it.\n" + 
                         "-o or --output: writes the output in the terminal to a text file named <your file name>_stepped_through.txt. " +  
                         "Look in there for a more slowed down step through.\n" + 
-                        "-s or --show: shows at the end state of the values that python associates with each variable.\n" +
+                        "-s or --show: shows at the end the state of the values that python associates with each variable.\n" +
                         "\nThe syntax for steppy usage is: py steppy_main.py [name of your file] [options from above]\n" + 
                         "for example: py steppy_main.py my_file.py --output my_file_output -v\n" +
                         "This will make a text file with steppy process in it, aswell as show the ast Tree of said file.")
