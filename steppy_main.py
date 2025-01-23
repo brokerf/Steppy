@@ -1,5 +1,5 @@
 import sys
-import os
+
 import ast
 from pathlib import Path
 from steppy_classes import *
@@ -31,7 +31,7 @@ def constructClass(module: ast.Module) -> list:
             clas = UnaryOp(i)
             classes.append(clas)
         elif typ == ast.BinOp:
-            clas = BinOp(i)
+            clas = BinaryOp(i)
             classes.append(clas)
         elif typ == ast.Compare:
             clas = Compare(i)
@@ -39,6 +39,11 @@ def constructClass(module: ast.Module) -> list:
         elif typ == ast.BoolOp:
             clas = BoolOpe(i)
             classes.append(clas)
+        elif typ == ast.Name:
+            clas = Name(i)
+            classes.append(clas)
+        else:
+            raise NotImplementedError(f"class {typ} not supported")
     return classes
 
 def IfElse(upper: list[str], middle: list[str], lower: list[str], ram: dict, test, body, orelse) -> None:
@@ -54,7 +59,7 @@ def IfElse(upper: list[str], middle: list[str], lower: list[str], ram: dict, tes
         else:
             lower[0] = lower[0].replace(test.id, str(ram[test.id]), 1)
             print_Steppy(upper, middle, lower)
-    """ Construct both left and right values recursiverly if needed to compare them"""
+    """ Construct both left and right values recursiverly if needed to compare them """
     if type(test) == ast.Compare:
         check_sucess = handleCompare(upper, middle, lower, ram, Compare(test))
     if type(test) == ast.UnaryOp:
@@ -62,16 +67,17 @@ def IfElse(upper: list[str], middle: list[str], lower: list[str], ram: dict, tes
     if type(test) == ast.BoolOp:
         check_sucess = BoolOp(upper, middle, lower, ram, test)
     orelse_str = ast.unparse(orelse)
-    if type(orelse[0]) == ast.If:
-        orelse_str = "el" + orelse_str
-    else:
-        orelse_str = "else:\n" + " " * 4 + orelse_str
-    #write whether the check suceeded or not
-    if not check_sucess:
-        lower[0] = lower[0][lower[0].index(orelse_str):]
-    else:
-        lower[0] = lower[0][:lower[0].index(orelse_str)]
-    print_Steppy(upper, middle, lower)
+    if orelse != []:
+        if type(orelse[0]) == ast.If:
+            orelse_str = "el" + orelse_str
+        else:
+            orelse_str = "else:\n" + " " * 4 + orelse_str
+        #write whether the check suceeded or not
+        if not check_sucess:
+            lower[0] = lower[0][lower[0].index(orelse_str):]
+        else:
+            lower[0] = lower[0][:lower[0].index(orelse_str)]
+        print_Steppy(upper, middle, lower)
     IfBody(upper, middle, lower, body if check_sucess else orelse, ram) #handle if - body
 
 def IfBody(upper: list[str], middle: list[str], lower: list[str], body: list[str], ram: dict) -> None:
@@ -114,8 +120,7 @@ def IfBody(upper: list[str], middle: list[str], lower: list[str], body: list[str
         elif type(i) == ast.If:
             IfElse(upper, middle, lower, ram, i.test, i.body, i.orelse)
         elif type(i) == ast.Expr:
-            middle.append(lower[0] + "\n")
-            lower.pop(0)
+            handleExpression(upper, middle, lower, ram, classes)
 
 def handleCompare(upper, middle, lower, ram, compare) -> bool:
     "Handle ast.Compare by iterating over the ops attribute of the body and putting the end-result together"
@@ -134,7 +139,7 @@ def handleCompare(upper, middle, lower, ram, compare) -> bool:
         case ast.BoolOp:
             left = BoolOp(upper, middle, lower, ram, left)
         case ast.Name:
-            lower[0] = lower[0].replace(str(left.id), str(ram[left.id]))
+            lower[0] = lower[0].replace(str(left.id), str(ram[left.id]), 1)
             left = ram[left.id]
             print_Steppy(upper, middle, lower)
     left_value = left
@@ -144,18 +149,17 @@ def handleCompare(upper, middle, lower, ram, compare) -> bool:
         right_value = right[i]
         compare_sucess &= compare_values(left_value, right_value, operation, upper, middle, lower, ram)
         left_value = right_value
-    
     if type(left_value) == ast.Name:
         left_value = ram[left_value.id]
+    if type(left_value) == ast.Constant:
+        left_value = left_value.value
     left_index = lower[0].index(str(left))
-    right_index = lower[0].index(str(left_value)) + len(str(left_value))
-    
+    right_index = lower[0][left_index + 1:].index(str(left_value)) + len(str(left_value)) + len(lower[0][:left_index + 1])
     if lower[0][left_index - 1] == "(" and lower[0][right_index + 1] == ")":
         left_index -= 1
         right_index += 1
-    lower[0] = lower[0].replace(lower[0][left_index:right_index], str(compare_sucess))
+    lower[0] = lower[0].replace(lower[0][left_index:right_index], str(compare_sucess), 1)
     print_Steppy(upper, middle, lower)
-    
     return compare_sucess
 
 def compare_values(left, right, operation, upper, middle, lower, ram):
@@ -168,7 +172,7 @@ def compare_values(left, right, operation, upper, middle, lower, ram):
         case ast.Constant:
             right = right.value
         case ast.Name:
-            lower[0] = lower[0].replace(str(right.id), str(ram[right.id]))
+            lower[0] = lower[0].replace(str(right.id), str(ram[right.id]), 1)
             print_Steppy(upper, middle, lower)
             right = ram[right.id]
     
@@ -269,10 +273,10 @@ def BinOp(upper: list[str], middle: list[str], lower: list[str], ram: dict, left
                 lower[0] = lower[0][:index] + lower[0][index:].replace(left.id, str(ram.get(left.id)), 1)
             else:
                 lower[0] = lower[0].replace(left.id, str(ram.get(left.id)), 1)
-            left = ram.get(left.id)    
+            left = ram.get(left.id)
             print_Steppy(upper, middle, lower)
         else:
-            raise NameError
+            raise NameError(f"Unknown variable {left.id} referenced before its assignement")
     elif type(left) == ast.Constant:
         left = left.value
     elif type(left) == ast.UnaryOp:
@@ -297,7 +301,7 @@ def BinOp(upper: list[str], middle: list[str], lower: list[str], ram: dict, left
         x = ast.BinOp(ast.Constant(left), op, ast.Constant(right))
         left_index = lower[0].index(ast.unparse(x))
         right_index = left_index + len(ast.unparse(x))
-        if lower[0][left_index - 1] == "(" and lower[0][right_index] == ")":   #surrounded by brackets so remove them
+        if lower[0][left_index - 1] == "(" and lower[0][right_index] == ")" and lower[0][0:6] != "print(":   #surrounded by brackets so remove them UNLESS its a print statement
             left_index -= 1
             right_index += 1
         if type(op) == ast.Add:
@@ -363,29 +367,57 @@ def handleClasses(upper, middle, lower, ram, classes):
             handleCompare(upper, middle, lower, ram, classes)
         case "BoolOp":
             BoolOp(upper, middle, lower, ram, classes)
+        case "Name":
+            handleName(upper, middle, lower, ram, classes)
         case _:
             raise NotImplementedError(f'Not Supported Class {op}')
-        
+
+def handleName(upper, middle, lower, ram, classes):
+    """
+    handle one-line statements that do essential nothing here
+    i.e: 
+    >>> fahrenheit
+    or
+    >>> 42
+    etc.
+    """
+    lower[0] = lower[0].replace(classes.id, str(ram[classes.id]), 1)
+    print_Steppy(upper, middle, lower)
+    return ram[classes.id]
+
 def handleBinOp(upper, middle, lower, ram, classes):
-    value = classes.getValue()
-    BinOp(upper, middle, lower, ram, value.left, value.op, value.right)
-    lower[0] = lower[0].replace("(", "")
-    lower[0] = lower[0].replace(")", "")
-    line2 = ast.parse(lower[0])
-    ram[line2.body[0].targets[0].id] = line2.body[0].value.value
-    upper.append(lower[0])
-    lower.pop(0)
+    BinOp(upper, middle, lower, ram, classes.getLeft(), classes.getOpe(), classes.getRight())
 
 def handleExpression(upper, middle, lower, ram, classes):
+    """
+    Currently only supports print
+    """
     value = classes.getValue()
-    if value.func.id == "print":
-        x = ast.Module()
-        x.body = value.args
-        for arg in constructClass(x):
-            handleClasses(upper, middle, lower, ram, arg)
-        middle.append("'" + lower[0][6:lower[0].index(")")] + "'" +  "\n")
+    if type(value) == ast.Call and value.func.id == "print":
+        """
+        encountered a print statement
+        """
+        intern_classes = ast.Module(value.args, [])
+        intern_classes = constructClass(intern_classes)
+        result_str = None
+        for clas in intern_classes:
+            if clas.getOp() == "Name":
+                result_str = str(handleName(upper, middle, lower, ram, clas))
+                continue
+            handleClasses(upper, middle, lower, ram, clas)
+        if not result_str:
+            result_str = lower[0][6:lower[0].rindex(")")]
+        middle.append("'" + result_str + "'" +  "\n")
         lower.pop(0)
-        print_Steppy(upper, middle, lower)
+    else:
+        """
+        a one-line statement with no real information to be stored or assigned to, so we execute it and move it to upper
+        """
+        intern_class = ast.Module([value], [])
+        intern_class = constructClass(intern_class)
+        handleClasses(upper, middle, lower, ram, intern_class[0])
+        upper.append(lower[0])
+        lower.pop(0)
 
 def handleAssign(upper, middle, lower, ram, classes):
     targets = classes.getTargets()
@@ -407,16 +439,17 @@ def handleAssign(upper, middle, lower, ram, classes):
     elif type(value) == ast.BoolOp:
         ram[targets[0].id] = BoolOp(upper, middle, lower, ram, BoolOpe(value))
     elif type(value) == ast.BinOp:
-        ram[targets[0].id] == BinOp(upper, middle, lower, ram, value.left, value.op, value.right)
+        ram[targets[0].id] = BinOp(upper, middle, lower, ram, value.left, value.op, value.right)
     elif type(value) == ast.Constant:
         ram[targets[0].id] = value.value
     upper.append(lower[0])
     lower.pop(0)
-    print_Steppy(upper, middle, lower)
 
 def handleAugAssign(upper, middle, lower, ram, classes):
-    """ Convert an AugAssign into a regular Assign with var to be assigned to, as its left value i.e:\n
-     x += 2 -> x = x + 2; x *= y + 2 -> x = x * (y + 2) """
+    """ 
+    Convert an AugAssign into a regular Assign with var to be assigned to, as its left value i.e:\n
+    x += 2 -> x = x + 2; x *= y + 2 -> x = x * (y + 2) 
+    """
     targets = classes.getTargets()
     new_line = ast.Assign([targets], ast.BinOp(targets, classes.getOpe(), classes.getValue()))
     new_line.lineno = 0
@@ -426,8 +459,8 @@ def handleAugAssign(upper, middle, lower, ram, classes):
     """ Convert the right of new_line into a BinOp so that we can process it and assign the value to the var"""
     new_value = BinOp(upper, middle, lower, ram, new_line.value.left, new_line.value.op, new_line.value.right)
     ram[targets.id] = new_value
-    lower[0] = lower[0].replace(")", " ")
-    lower[0] = lower[0].replace("(", " ")
+    lower[0] = lower[0].replace(")", "")
+    lower[0] = lower[0].replace("(", "")
     upper.append(lower[0])
     lower.pop(0)
 
@@ -449,7 +482,7 @@ def handleUnaryOp(upper: list[str], middle: list[str], lower: list[str], ram: di
         case ast.Constant:
             operand = operand.value
         case ast.Name:
-            operand = ram[operand.id]
+            operand = handleName(upper, middle, lower, ram, Name(operand))
         case ast.Compare:
             operand = handleCompare(upper, middle, lower, ram, Compare(operand))
         case ast.UnaryOp:
@@ -542,10 +575,10 @@ if __name__ == "__main__":
                         "-h or --help: displays this message, you know how to use it.\n" + 
                         "-o or --output: writes the output in the terminal to a text file named <your file name>_stepped_through.txt. " +  
                         "Look in there for a more slowed down step through.\n" + 
-                        "-s or --show: shows at the end the state of the values that python associates with each variable.\n" +
+                        "-s or --show: shows at the end, the state of the values that python associates with each variable.\n" +
                         "\nThe syntax for steppy usage is: py steppy_main.py [name of your file] [options from above]\n" + 
                         "for example: py steppy_main.py my_file.py --output my_file_output -v\n" +
-                        "This will make a text file with steppy process in it, aswell as show the ast Tree of said file.")
+                        "This will make a text file with steppy processes in it, aswell as show the ast Tree of said file.")
                 exit(1)
             print_Steppy(upper, middle, lower)
             for classes in constructClass(parsed):
@@ -554,5 +587,13 @@ if __name__ == "__main__":
             if "-s" in sys.argv or "--show" in sys.argv:
                 print("+" + "-" * (len(str(ram)) + 2) + "+")
                 print("| " + str(ram) + " |")
-                print("+" + "⁻" * (len(str(ram)) + 2) + "+")
+                print("+" + "-" * (len(str(ram)) + 2) + "+")
+                if to_text:
+                    file = open(Path(fileName), "a")
+                    file.write("\n")
+                    file.write("Below are the variables and their values at the end of file execution:\n")
+                    file.write("+" + "-" * (len(str(ram)) + 2) + "+\n")
+                    file.write("| " + str(ram) + " |\n")
+                    file.write("+" + "-" * (len(str(ram)) + 2) + "+\n")
+                    file.close()
             exit(1)

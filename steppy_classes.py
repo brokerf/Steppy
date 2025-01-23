@@ -16,8 +16,8 @@ class Assign:
         self.targets = field.targets
         self.value = field.value
         self.op = "Assign"
-        if type(field.value) == ast.BinOp:
-            self.op = "BinOp"
+        """if type(field.value) == ast.BinOp:
+            self.op = "BinOp"""
         self.field = field
     
     def getTargets(self):
@@ -52,6 +52,18 @@ class Expression:
     def getField(self):
         return self.field
     
+class Name:
+
+    def __init__(self, field):
+        self.id = field.id
+        self.op = "Name"
+
+    def getId(self):
+        return self.id
+    
+    def getOp(self):
+        return self.op
+
 class If:
 
     def __init__(self, field):
@@ -124,11 +136,11 @@ class ForLoop:
     def getOp(self):
         return self.op
 """
-class BinOp:
+class BinaryOp:
 
     def __init__(self, field):
         self.left = field.left
-        self.right = field.rigt
+        self.right = field.right
         self.ope = field.op
         self.op = "BinOp"
         self.field = field
